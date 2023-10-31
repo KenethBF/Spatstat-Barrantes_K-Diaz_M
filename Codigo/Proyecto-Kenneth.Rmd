@@ -1,0 +1,94 @@
+---
+title: "Tarea 3"
+author: "Kenneth Barrantes"
+date: "`r Sys.Date()`"
+output: 
+  html_document: 
+    toc: yes
+    toc_depth: 4
+    toc_float:
+      collapsed: no
+      smooth_scroll: no
+
+---
+
+```{r, message=FALSE}
+
+library(dplyr)
+library(spatstat)
+
+```
+
+# Set de datos
+
+Cargar archivo
+
+```{r}
+carapa <- read.csv("../Datos/Mapeamento_parcelas_corregido.csv",
+                   header = T,
+                   sep = ";",
+                   stringsAsFactors = TRUE)	
+head(carapa)
+
+```
+
+Función crear variables
+
+```{r}
+
+randv <- function( x, y, z) {
+  sample(seq(x, y, l = z), size = length(carapa$DAP), replace = TRUE)
+} 
+
+```
+
+Crear variables
+
+```{r}
+
+carapa$dbranch <- randv(0, 4, 5) # ramas muertas
+
+carapa$vinec <- randv(0, 4, 5) # cobertura enredaderas
+
+carapa$leafq <- randv(0, 4, 5) # carga de hojas
+
+carapa$arth <- randv(0, 1, 2) # dano por artropodos
+
+carapa$respr <- randv(0, 1, 2) # rebrote
+
+carapa$cank <- randv(0, 1, 2) # cancros
+
+carapa$height <- randv(1.5, 18, 1000) # altura arbol
+
+carapa$repr <- sample(c("flower", # estatus reproductivo
+                        "acorn",
+                        "a_fall",
+                        "n_repr"),
+                      size = length(carapa$DAP),
+                      replace = TRUE)
+
+```
+
+Formato variables
+
+```{r}
+
+carapa <- carapa %>% mutate_at(c("Parc", # convertir a factor
+                                 "Sub.P",
+                                 "NumAr",
+                                 "vinec",
+                                 "repr",
+                                 "leafq"),
+                               as.factor)
+
+carapa <- carapa %>% mutate_at(c("Prod.", # convertir a logicos
+                                 "arth",
+                                 "respr",
+                                 "cank"),
+                               as.logical)
+
+
+head(carapa)
+str(carapa)
+
+```
