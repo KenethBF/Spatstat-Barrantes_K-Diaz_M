@@ -1,0 +1,232 @@
+---
+title: "Spatstat. Adrian Baddeley, Rolf Turner, Ege Rubak"
+author: "Kenneth Barrantes; Maureen Diaz"
+date: "`r Sys.Date()`"
+output: rmdformats::material
+---
+# Descripción Spatstat
+
+Spatstat es un paquete de análisis de patrones espaciales. Permite la lectura de datos bidimensionales (coordenadas x,y) o tridimensionales al incluir temporalidad, patrones de puntos lineales o de objetos.
+Es un paquete amplio, con varias dependencias y más de 3000 funciones, gran variedad de análisis.
+
+Disponible en  https://cran.r-project.org/web/packages/spatstat/, a trabajar con versión 3.0-7
+
+# Librerías necesarias
+
+```{r, message=FALSE}
+library(spatstat)
+library(ggplot2)
+```
+
+# Cargar y dar formato a datos
+
+Se emplea base de datos correspondiente al artículo [Population structure of Carapa guianensis in two forest types in the southwestern Brazilian Amazon](https://www.sciencedirect.com/science/article/abs/pii/S0378112707004264?via%3Dihub), compartida por Christie Klimas.
+En este estudio se evalua la viabilidad ecológica de explotar *Carapa guianensis* en la producción de frutos. Para esto se evalua la distribución de las poblaciones silvestres estableciendo parcelas (400 m x 400 m) en sitios con inundaciones estacionales y no inundados del amazonas. Se cuentan con dos parcelas por sitio (1 y 3 inundado, 2 y 4 no inundado), teniendo datos de posición de arboles a partir de coordenadas locales (medición con cinta metrica en campo).
+
+
+```{r}
+carapa <- read.csv("../Datos/Mapeamento_parcelas_corregido.csv", # cargar base de datos
+                   header = T, # asignar títulos según primera columna
+                   sep = ";", # separador de columnas
+                   stringsAsFactors = TRUE)	# asignar columnas de caracteres como factores
+
+
+carapa$Parc <- as.factor(carapa$Parc) # transformar "Parcelas" de entero a factor
+carapa$Sub.P <- as.factor(carapa$Sub.P) # transformar "Subparcela" de entero a factor
+carapa$Prod. <- as.logical(carapa$Prod.) # transformar "Producción de fruto" de entero a lógico
+
+str(carapa) # estructura de base de datos
+head(carapa) # previsualizar datos
+
+```
+
+
+# Exploración de datos
+
+Graficar disposición de arboles en parcelas
+
+```{r}
+
+disp_arb <- ggplot(carapa, aes(x_rev, y)) + # asignación de base de variables "x" y "y" a partir de coordenadas x corregidas
+  geom_point() + # asignación de puntos en gráfico
+  facet_wrap(carapa$Parc) # crea gráficos por parcela
+
+disp_arb
+
+```
+
+Densidad de arboles en parcelas
+
+```{r}
+
+dens_arb <- ggplot(carapa, aes(x_rev, y)) + # asignación de base de variables "x" y "y" a partir de coordenadas
+  stat_density_2d(aes(fill = after_stat(density)), # capa densidad de puntos
+                  geom = "raster", # geometría raster
+                  contour = FALSE) + # eliminación de contornos en puntos
+  facet_wrap(carapa$Parc) # crea gráficos por parcela
+dens_arb
+
+# plot(density(parc1_coor)) # otra opción de densidad, pero para poner varios hay que poner nfrow o algo así (esa vara que va poniendo graficos a como se van haciendo)
+```
+
+
+# Funciones spatstat
+
+Se calculan patrones de distribución para individuos adultos (DAP > 20 cm)
+
+```{r}
+adultos <- carapa[carapa$DAP > "20", ] # subconjunto de individuos adultos
+head(adultos)
+```
+
+
+## Parámetro distribución R
+
+Patrones de distribución según R. Si R=1 distribución aleatoria. R tiende a 0 distribución agregada. R cercano a 2.15 distribución uniforme.
+
+
+Parcela 1:
+
+```{r}
+parc1 <- adultos[adultos$Parc == "1", ] # subconjunto adultos de parcela 1
+
+# Dar formato de coordenadas a variables "x" y "y"
+parc1_coor <- ppp(parc1$x_rev, # coordenadas en x
+                  parc1$y, # coordenadas en y
+                  window = owin(c(0,400), # delimitación coordenadas x
+                                c(0,400))) # delimitación coordenadas y
+
+
+
+clarkevans.test(parc1_coor, correction = "donnelly") # calculo de R con correción efecto borde
+
+```
+
+
+Parcela 2:
+
+```{r}
+parc2 <- adultos[adultos$Parc == "2", ]
+parc2_coor <- ppp(parc2$x_rev,
+                  parc2$y,
+                  window = owin(c(0,400), 
+                                c(0,400)))
+
+clarkevans.test(parc2_coor, correction = "donnelly")
+```
+
+
+Alternativa: prueba hipótesis distribución aleatoria
+
+```{r}
+plot(quadratcount(parc1_coor)) # distribución conjunto de datos
+quadrat.test(parc1_coor, nx = 5) # hipótesis nula aleatorio
+
+quadrat.test(parc2_coor)
+
+```
+
+
+## Parámetro distribución Ripley´s K
+
+Aplicación Ripley´s K para individuos en cada parcela.Estimadores:
+
+* K iso: estimado isotropico corregido.
+* K trans: estimado con corrección translacional. 
+* K border: estimado de borde corregido, menos eficiente estadisticamente, pero de menos consumo. 
+* K pois(theo): K teorico por Poisson para distribución **aleatoria**
+
+
+```{r}
+
+K1 <- Kest(parc1_coor) # Kest= función para estimadores Ripley´s K
+K1 # detalles de estimadores de función
+plot(K1) # graficación de estimadores
+
+head(as.data.frame(K1)) # previsualización de datos gráfico K1
+```
+
+
+Se puede aplicar para las otras parcelas
+
+```{r}
+# Parcela 2
+K2 <- Kest(parc2_coor)
+plot(K2)
+
+```
+
+Estos parametros permiten visualizar las tendencias de estimadores, más no son empleados como criterio de distribución. Para esto se emplea la función `envelope`.
+
+```{r}
+E1 <- envelope(parc1_coor, # base de datos espacial
+              Kest, # función cálculo Ripleys K
+              nsim=1000) # generación de puntos siguiendo patrón aleatorio a partir de Kpois(theo)
+plot(E1)
+
+```
+La zona sombreada muestra los valores más altos y bajos generados a partir de Kpois. Mientras la linea continua (Kr observada) se encuentre dentro de la zona sombreada la distribución es aleatoria, sobre esta es agregada y bajo la misma uniforme.
+
+
+```{r, message=FALSE}
+E2 <- envelope(parc2_coor, 
+              Kest, 
+              nsim=1000)
+
+
+
+E2.1 <- envelope(parc2_coor, 
+              Kest, 
+              nsim=100) 
+
+
+E2.2 <- envelope(parc2_coor, 
+              Kest, 
+              nsim=10)
+
+
+plot(E2)
+plot(E2.1)
+plot(E2.2)
+```
+
+
+## Función Besag's L
+
+La transformación de Besag's L toma los estimados de Ripley's K y los convierte a distribución lineal con respecto a una distribución aleatoria.
+
+```{r}
+L <- sqrt(K1/pi) # transformación Besag's L
+plot(L)
+```
+Besag's L es usado para determinar el patrón de distribución. Para esto se coloca el estimado de la distribución aleatoria con pendiente "0" y valor "0" en eje "y", valores negativos distribuciones uniformes y positivos agrupados 
+
+```{r}
+
+L <- sqrt(K1/pi)
+plot(L, . - theo ~ r)
+
+```
+
+
+Para agregar intervalos de valores aleatorios se emplea `envelop`
+
+```{r}
+
+A2 <- envelope(parc1_coor, global=FALSE, nsim=10, transform=expression(sqrt(./pi)))
+plot(A2, . - theo ~ r)
+
+```
+
+Graficos mediados por spatspat agrega leyendas automaticamente y asigna posición automaticamente evitando lines de estimados, sin embargo se puede eliminar
+
+```{r}
+plot(A2, . - theo ~ r, legend = FALSE) # eliminar leyenda
+
+```
+
+# Información de la sesión
+
+```{r session, echo=FALSE}
+sessionInfo() # Información de la sesión
+```

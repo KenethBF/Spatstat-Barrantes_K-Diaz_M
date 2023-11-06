@@ -1,0 +1,4 @@
+"0","parc1 <- adultos[adultos$Parc == ""1"", ] # subconjunto adultos de parcela 1
+"
+"2","Error: object 'adultos' not found
+"
