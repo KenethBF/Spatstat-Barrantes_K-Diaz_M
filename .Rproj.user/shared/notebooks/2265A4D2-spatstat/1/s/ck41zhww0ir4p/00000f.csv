@@ -1,0 +1,7 @@
+"0","# Parcela 2"
+"0","K2 <- Kest(parc2_coor)"
+"0","plot(K2,"
+"0","     xlab= ""Tamaño del cuadrante"","
+"0","     ylab= ""K de Ripley"","
+"0","     main= ""Distribución K de Ripley"")"
+"0",""

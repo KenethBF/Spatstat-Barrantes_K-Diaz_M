@@ -1,0 +1,8 @@
+"0",""
+"0","L <- sqrt(K1/pi)"
+"0","plot(L, . - theo ~ r,"
+"0","     xlab= ""Tamaño del cuadrante"","
+"0","     ylab= ""L de Besag"","
+"0","     main= ""Distribución de Besag"","
+"0","     legend= FALSE)"
+"0",""

@@ -1,0 +1,5 @@
+"0",""
+"0","plot(E2.1,"
+"0","     xlab= ""Tamaño del cuadrante"","
+"0","     ylab= ""K de Ripley"","
+"0","     main= ""Distribución K de Ripley"")"

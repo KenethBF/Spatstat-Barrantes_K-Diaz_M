@@ -5,7 +5,10 @@ date: "`r Sys.Date()`"
 output: rmdformats::material
 ---
 
-# Descripción Spatstat
+
+
+
+## Descripción Spatstat
 
 Spatstat es un paquete de análisis de patrones espaciales. Permite la lectura de datos bidimensionales (coordenadas x,y) o tridimensionales al incluir temporalidad, patrones de puntos lineales o de objetos geometricos.
 Es un paquete amplio, con varias dependencias y más de 3000 funciones, y se pueden realizar gran variedad de análisis.
@@ -168,7 +171,7 @@ plot(K2,
 
 ```
 
-Estos parametros permiten visualizar las tendencias de estimadores, pero aún no pueden ser empleados como criterio de distribución. Para esto se emplea la función `envelope`.
+Estos parametros permiten visualizar las tendencias de estimadores, más no son empleados como criterio de distribución. Para esto se emplea la función `envelope`.
 
 ```{r}
 E1 <- envelope(parc1_coor, # base de datos espacial

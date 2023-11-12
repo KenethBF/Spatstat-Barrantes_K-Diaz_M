@@ -1,0 +1,7 @@
+"0",""
+"0","dens_arb <- ggplot(carapa, aes(x_rev, y)) + # asignación de base de variables ""x"" y ""y"" a partir de coordenadas"
+"0","  stat_density_2d(aes(fill = after_stat(density)), # capa densidad de puntos"
+"0","                  geom = ""raster"", # geometría raster"
+"0","                  contour = FALSE) + # eliminación de contornos en puntos"
+"0","  facet_wrap(carapa$Parc) # crea gráficos por parcela"
+"0","dens_arb"

@@ -1,0 +1,6 @@
+"0","L <- sqrt(K1/pi) # transformación Besag's L"
+"0","plot(L,"
+"0","     xlab= ""Tamaño del cuadrante"","
+"0","     ylab= ""L de Besag"","
+"0","     main= ""Distribución de Besag"","
+"0","     legend = FALSE)"

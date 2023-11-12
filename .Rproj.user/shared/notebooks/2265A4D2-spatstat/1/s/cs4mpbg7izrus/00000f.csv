@@ -1,0 +1,2 @@
+"0","adultos <- carapa[carapa$DAP > ""20"", ] # subconjunto de individuos adultos"
+"0","head(adultos)"

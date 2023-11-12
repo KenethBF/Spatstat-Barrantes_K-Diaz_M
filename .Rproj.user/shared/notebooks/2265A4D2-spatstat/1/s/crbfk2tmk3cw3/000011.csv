@@ -1,0 +1,6 @@
+"0","plot(A2, . - theo ~ r,"
+"0","     xlab= ""Tamaño del cuadrante"","
+"0","     ylab= ""L de Besag"","
+"0","     main= ""Distribución de Besag"","
+"0","     legend = FALSE) # eliminar leyenda"
+"0",""
