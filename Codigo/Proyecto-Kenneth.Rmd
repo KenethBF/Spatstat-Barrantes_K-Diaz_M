@@ -1,94 +1,381 @@
 ---
-title: "Tarea 3"
+title: "Análisis demográfico de una especie explotada del amazonas: Carapa guianensis"
 author: "Kenneth Barrantes"
 date: "`r Sys.Date()`"
-output: 
-  html_document: 
-    toc: yes
-    toc_depth: 4
-    toc_float:
-      collapsed: no
-      smooth_scroll: no
-
+output: rmdformats::material
 ---
 
-```{r, message=FALSE}
+# Introducción
 
+La cuenca del Amazonas contiene más de la mitad de la selva tropical restante en el mundo, actualmente enfrentándose a cambios sin precedentes (Fearnside, 2005). Los seres humanos desempeñamos un papel protagonista en estos cambios en busca de nuestro propio beneficio (Wood, 2002). Sin embargo, esta explotación del recurso natural conlleva costos ambientales asociados (Peres et al., 2003), siendo necesaria una regulación con base teórica y conocimiento científico para graduar esta explotación de manera sostenible. Una alternativa de bajo costo y rápida producción de información son los censos demográficos a corto plazo (Chien et al., 2008).
+
+
+Los patrones de abundancia, distribución y estructura demográfica brindan información para la toma de desiciones y explotación de recursos naturales (Bruna y Ribeiro, 2005). Sin embargo, deben evaluarse múltiples hábitats y factores que puedan influir sobre la demografía sobre la mayor parte de la distribución de la especie en cuetión. Carapa guianensis (Meliaceae) por la industria aceitera como por su recurso maderable (Dayanandan et al., 1999). Sin embargo, la explotación desregulada presenta un escenario hasta el momento desconocido para la especie, coincidiendo con un faltante de información de historia natural para la misma (Klimas, 2007).  
+
+Es por esto que en este reporte pretendo:
+
+- Explorar estructuras demográficas de *Carapa guianensis* para dos diferentes ambientes (terra firme y baixo), enfocandome en adultos y subadultos en sitios con historia de explotación de frutos madera.
+
+- Identificar factores que inciden sobre el patrón espacial en adultos y subadultos de *Carapa guianensis*
+
+# Métodos y resultados
+
+*Librerias*
+```{r, message = FALSE, warning=FALSE}
 library(dplyr)
 library(spatstat)
-
+library(ggplot2)
+library(car)
+library(rcompanion)
+library(FSA)
+library(leaflet)
 ```
 
-# Set de datos
 
-Cargar archivo
+## Sitio de estudio
 
-```{r}
-carapa <- read.csv("../Datos/Mapeamento_parcelas_corregido.csv",
-                   header = T,
-                   sep = ";",
-                   stringsAsFactors = TRUE)	
-head(carapa)
-
-```
-
-Función crear variables
+El estudio se realiza dentro de los límites de Brazilian Agricultural Research Corporation (Embrapa) (Fig. 1) al suroeste del estado de Acre, Brazil. En la zona predomina el bosque tropical húmedo (Holdridge, 1978), poseyendo una temporada lluviosa corta que se extiende junio a agosto con una humedad relativa que varía de 71 a 91% (UFAC, 2005). El sitio cuenta con una topografía mayormente plana, frecuentemente inundadas durante la estación lluviosa (Klimas et al., 2007).
 
 ```{r}
 
-randv <- function( x, y, z) {
-  sample(seq(x, y, l = z), size = length(carapa$DAP), replace = TRUE)
-} 
+coord <- data.frame(site = "EMBRAPA", # nombre de sitio
+                    lat = -10.025025, # coordenada decimal latitudinal
+                    long = -67.706301, # coordenada decimal longitudinal
+                    stringsAsFactors = TRUE) # convierte columna "site" a factor
 
 ```
 
-Crear variables
-
 ```{r}
 
-carapa$dbranch <- randv(0, 4, 5) # ramas muertas
+leaflet(coord) |> # carga dataset coord a paquete
+    addTiles() |> 
+    setView(-67.706301, -10.025025, 5) |> # coordenadas centrales y zoom de proyección 
+    addAwesomeMarkers(~long, ~lat, popup = ~site) # añade marcadores por columna long y lat, etiquetas por site
 
-carapa$vinec <- randv(0, 4, 5) # cobertura enredaderas
+```
+Fig 1. Sitio de estudio.
 
-carapa$leafq <- randv(0, 4, 5) # carga de hojas
+## Establecimiento parcelas y toma de datos:
 
-carapa$arth <- randv(0, 1, 2) # dano por artropodos
+Se establecen cuatro parcelas de 400 m x 400 m, con una distancia mínima de 500 m entre el punto más cercano de estas. Las parcelas son seleccionadas tomando como criterio que la mayor cobertura del paisaje se encuentre representada por bosuqe, para dos parcelas con zonas ocasionalmente inundadas (Baixo) y dos con baja frecuencia o ningún reporte de inundación (Terra firme). Dentro de cada parcela se identificó y asignó un código único a todos los individuos de *C. guianensis* que presentaran un diámetro a la altur del pecho (DAP, 130 cm) igual o mayor a 10 cm. De cada individuo seleccionado se midió el DAP, código único, parcela en que se encontró, estrato del dosel al que se encontraba su copa (codominante, dominante, intermediaria, suprimida), microambiente (radio de 2 m del tronco). A su vez se asignó la categoría de adultos a individuos con un DAP mayor a 20 cm y como subadultos a los que poseeyeran un diamétro inferior.
 
-carapa$respr <- randv(0, 1, 2) # rebrote
+Tomado de Klimas et al. (2007).
 
-carapa$cank <- randv(0, 1, 2) # cancros
 
-carapa$height <- randv(1.5, 18, 1000) # altura arbol
+## Análisis estadístico y resultados
 
-carapa$repr <- sample(c("flower", # estatus reproductivo
-                        "acorn",
-                        "a_fall",
-                        "n_repr"),
-                      size = length(carapa$DAP),
-                      replace = TRUE)
+Inicialmente exploré la base de datos para verificar errores de digitación, formato y disponibilidad de datos.
+
+```{r}
+# Cargar base de datos
+carapa <- read.csv("../Datos/Mapeamento_parcelas_corregido.csv", # cargar base de datos
+                   header = T, # asignar títulos según primera columna
+                   sep = ";", # separador de columnas por ";"
+                   stringsAsFactors = TRUE)	# asignar columnas de caracteres como factores
+
+
+carapa$Parc <- as.factor(carapa$Parc) # transformar "Parcelas" de entero a factor
+carapa$Prod. <- as.logical(carapa$Prod.) # transformar "Producción de fruto" de entero a lógico
+
+levels(carapa$copa) <- c("codominante", "dominante", "intermediaria", "suprimida")
+```
+
+```{r}
+str(carapa) # estructura de la base de datos
+DT::datatable(carapa, options = list(pageLength = 3)) # previsualización de datos
+```
+
+Para tener dar una intepretación biólogica de los datos grafiqué la disposición de arboles y estructura edades en las parcelas. Previsualizo una distribución espacial distribuida a lo largo de toda la parcela, sin nucleo de población o agregaciones por estadio (Fig. 2). La estructura demográfica sigue un patrón de J invertida, indicando una tasa de reclutamiento sin largos periodos de baja o nula germinación o muerte de cohortes completos (Fig. 3 y 4), sin embargo para subadultos la disbución es relativamente uniforme (Fig. 5), posiblemente afectada por el bajo rango de tallas
+
+```{r}
+# gráficos exploratorios
+disp_arb <- ggplot(carapa, aes(x_rev, y)) + # asignación de base de variables "x" y "y" a partir de coordenadas x corregidas
+  geom_point(aes(colour = DAP > "20" )) + # asignación de puntos y colores según adultos y subadultos
+  xlab("Tamaño parcela (m)") + # título eje x
+  ylab("Tamaño parcela (m)") + # título eje y
+  facet_wrap(carapa$Parc) # crea gráficos por parcela
+disp_arb
+```
+Figura 2. Densidad de individuos para cuatro parcelas de *Carapa guianensis*. Se indican en color rojo individuos con un diámetros mayor a 20 cm y de color celeste los que poseen un diámetro inferior.
+
+
+
+```{r, results='hide'}
+adultos <- subset(carapa, DAP > 20) # subconjunto de individuos adultos
+subadultos <- subset(carapa, DAP < 20) # subconjunto de individuos subadultos
+```
+
+```{r, eval=FALSE}
+hist(carapa$DAP, xlab = "DAP (cm)" , ylab = "Frecuencia", main = "") # histograma estructura según DAP para todos los datos
+hist(adultos$DAP, xlab = "DAP (cm)" , ylab = "Frecuencia", main = "") # histograma estructura según DAP para adultos
+hist(subadultos$DAP, xlab = "DAP (cm)" , ylab = "Frecuencia", main = "") # histograma estructura según DAP para subadultos
+```
+
+```{r, echo=FALSE}
+hist(carapa$DAP, xlab = "DAP (cm)" , ylab = "Frecuencia", main = "") # histograma estructura según DAP para todos los datos
+```
+Figura 3. Histograma de frecuencias para diámetro a la altura del pecho (DAP) para individuos de *Carapa guianensis*.
+
+```{r, echo=FALSE}
+hist(adultos$DAP, xlab = "DAP (cm)" , ylab = "Frecuencia", main = "") # histograma estructura según DAP para adultos
+```
+Figura 4. Histograma de frecuencias para diámetro a la altura del pecho (DAP) para individuos adultos de *Carapa guianensis*.
+
+```{r, echo=FALSE}
+hist(subadultos$DAP, xlab = "DAP (cm)" , ylab = "Frecuencia", main = "") # histograma estructura según DAP para subadultos
+```
+Figura 5. Histograma de frecuencias para diámetro a la altura del pecho (DAP) para individuos subadultos de *Carapa guianensis*.
+
+
+Emplee el índice de patrones espaciales R para poblaciones con baja movilidad (Clark and Evans, 1954). Interpreto para valor R igual a 1 distribución aleatoria, mayor a 1 distribución uniforme y menor agregada (Fig. 6). 
+Para estimar si las condiciones de inundado frecuentemente o no inundado afectan la distribución espacial de los individuos de *C. guianensis* calculé índice R para cada parcela según adultos y subadultos, que en todas las parcelas y estadios el indice resultante corresponde a un patrón agregado (Tabla 1).
+
+<img src = "../figuras/patron.png" width = "800 px"/>
+Figura 6. Patrones de agregación para organismos con movilidad reducida según indice de agregación R.
+
+```{r, results = 'hide', warning=FALSE}
+# asignar formato estacial a coordenadas x y
+coordpar <- function(x, y) { # x = adulto/subadulto, y = numero parcela (1:4)
+  baset <- x
+  subcparc <- x[x$Parc == y, ] # subconjunto adultos de parcela x
+  parccoor <- ppp(subcparc$x_rev, # coordenadas en x
+                  subcparc$y, # coordenadas en y
+                  window = owin(c(0,400), # delimitación coordenadas x
+                                c(0,400))) # delimitación coordenadas y
+  return(parccoor)
+}
+
+parc1a <- coordpar(adultos, 1) # asignacion formato coordenadas para adultos por numero parcela
+parc2a <- coordpar(adultos, 2)
+parc3a <- coordpar(adultos, 3)
+parc4a <- coordpar(adultos, 4)
+
+parc1s <- coordpar(subadultos, 1) # asignacion formato coordenadas para subadultos por numero parcela
+parc2s <- coordpar(subadultos, 2)
+parc3s <- coordpar(subadultos, 3)
+parc4s <- coordpar(subadultos, 4)
+
+Ra1 <- clarkevans.test(parc1a, correction = "donnelly") # calculo de R adultos con correción efecto borde
+Ra2 <- clarkevans.test(parc2a, correction = "donnelly")
+Ra3 <- clarkevans.test(parc3a, correction = "donnelly")
+Ra4 <- clarkevans.test(parc4a, correction = "donnelly")
+
+Rs1 <- clarkevans.test(parc1s, correction = "donnelly") # calculo de R subadultos con correción efecto borde
+Rs2 <- clarkevans.test(parc2s, correction = "donnelly")
+Rs3 <- clarkevans.test(parc3s, correction = "donnelly")
+Rs4 <- clarkevans.test(parc4s, correction = "donnelly")
+```
+
+Tabla 1. Patrón de agregación para individuos adultos y suadultos en parcelas de demográficas. R.index indica índice de agregación y p value estadístico de confianza respectivo.
+```{r, echo=FALSE}
+Rindexs <- data.frame("Estadio_parcela" = c("Ra1", "Ra2", "Ra3", "Ra4", "Rs1", "Rs2", "Rs3", "Rs4"),
+                     "R index" = c(Ra1$statistic, Ra2$statistic, Ra3$statistic, Ra4$statistic, Rs1$statistic, Rs2$statistic, Rs3$statistic, Rs4$statistic),
+                     "p value" = c(Ra1$p.value, Ra2$p.value, Ra3$p.value, Ra4$p.value, Rs1$p.value, Rs2$p.value, Rs3$p.value, Rs4$p.value))
+
+DT::datatable(Rindexs) # previsualización de datos
+```
+
+Para una mayor comprensión e interpretación biólogica de patrón espacial individual gráfico comportamiento según L de Besag (Besag, 1977). Todas las parcelas y estadios cuentan con un patrón de agregación, sin embargo entre parcelas hay variación sobre según el tamaño del cuadrante (Fig. 7). Las parcelas correspondientes a sitios no inundados (terra firme) presentan un aumento en la agregación conforme aumenta el tamaño del cuadrante, mientras que los sitios inundados (Baixo) tienden a una mayor aleatoreidad conforme aumenta el tamaño del cuadrante.
+
+```{r, results = 'hide'}
+# estiamdo L de Besag
+Lp1a <- envelope(parc1a, global=FALSE, nsim=10, transform=expression(sqrt(./pi)))
+Lp2a <- envelope(parc2a, global=FALSE, nsim=10, transform=expression(sqrt(./pi)))
+Lp3a <- envelope(parc3a, global=FALSE, nsim=10, transform=expression(sqrt(./pi)))
+Lp4a <- envelope(parc4a, global=FALSE, nsim=10, transform=expression(sqrt(./pi)))
+
+Lp1s <- envelope(parc1s, global=FALSE, nsim=10, transform=expression(sqrt(./pi)))
+Lp2s <- envelope(parc2s, global=FALSE, nsim=10, transform=expression(sqrt(./pi)))
+Lp3s <- envelope(parc3s, global=FALSE, nsim=10, transform=expression(sqrt(./pi)))
+Lp4s <- envelope(parc4s, global=FALSE, nsim=10, transform=expression(sqrt(./pi)))
+
+
+
+f2 <- function(x, y) {
+  plot(x, . - theo ~ r,
+     xlab= "Tamano del cuadrante (m)",
+     ylab= "L de Besag",
+     main= y,
+     legend = FALSE) # eliminar leyenda
+}
+```
+
+```{r, eval=FALSE}
+
+par(mfrow = c(2, 2), oma = c(0, 0, 0, 0))
+
+gLp1a <- f2(Lp1a, "Adultos \n Baixo (1)")
+gLp1s <- f2(Lp1s, "Subadultos \n Baixo (1)")
+gLp2a <- f2(Lp2a, "Terra Firme (2)")
+gLp2s <- f2(Lp2s, "Terra Firme (2)")
+
+gLp3a <- f2(Lp3a, "Baixo (3)")
+gLp3s <- f2(Lp3s, "Baixo (3)")
+gLp4a <- f2(Lp4a, "Terra Firme (4)")
+gLp4s <- f2(Lp4s, "Terra Firme")
 
 ```
 
-Formato variables
+```{r, echo=FALSE}
 
-```{r}
+par(mfrow = c(2, 2), oma = c(0, 0, 0, 0))
 
-carapa <- carapa %>% mutate_at(c("Parc", # convertir a factor
-                                 "Sub.P",
-                                 "NumAr",
-                                 "vinec",
-                                 "repr",
-                                 "leafq"),
-                               as.factor)
+gLp1a <- f2(Lp1a, "Adultos \n Baixo (1)")
+gLp1s <- f2(Lp1s, "Subadultos \n Baixo (1)")
+gLp2a <- f2(Lp2a, "Terra Firme (2)")
+gLp2s <- f2(Lp2s, "Terra Firme (2)")
 
-carapa <- carapa %>% mutate_at(c("Prod.", # convertir a logicos
-                                 "arth",
-                                 "respr",
-                                 "cank"),
-                               as.logical)
+gLp3a <- f2(Lp3a, "Baixo (3)")
+gLp3s <- f2(Lp3s, "Baixo (3)")
+gLp4a <- f2(Lp4a, "Terra Firme (4)")
+gLp4s <- f2(Lp4s, "Terra Firme")
+
+```
+
+Figura 7. Patrón de agregación individual de *Carapa guanensis* según tamaño del cuadrante.
 
 
-head(carapa)
-str(carapa)
+Para determinar si la parcela o el microambiente  tiene efecto sobre la distribución de tallas de los individuos realizé pruebas de Scheirer–Ray–Hare para conjuntos de datos no paramétricos. A partir de los análisis obtengo que solamente el ambiente tiene efecto sobre la distribución de tallas, para mayores DAP en ecosistemas inundados con respecto a los sitios no inundados y en transición (Fig. 8 y 9).
 
+```{r, results='hide'}
+carapa$DAP2 <- log(carapa$DAP)
+
+shapiro.test(carapa$DAP2)
+
+DAPs <- scheirerRayHare(DAP ~ Ambiente + Parc, # ScheirerRayHare test para DAP con respecto a Ambiente y parcela para totalidad de individuos
+                data = carapa)
+
+DAPsa <- scheirerRayHare(DAP ~ Ambiente + Parc, # ScheirerRayHare test para DAP adultos con respecto a Ambiente y copa
+                data = adultos)
+
+DAPss <- scheirerRayHare(DAP ~ Ambiente + Parc, # ScheirerRayHare test para DAP subadultos con respecto a Ambiente y copa
+                data = subadultos)
+
+```
+
+```{r, message = FALSE}
+
+DAPs # DAP ~ Ambiente + Parc total
+
+DAPsa # DAP ~ Ambiente + Parc adultos
+
+DAPss # DAP ~ Ambiente + Parc subadultos
+
+
+DAt <- dunnTest(DAP ~ Ambiente,
+              data=carapa,
+              method="bh")
+DAtdif <- cldList(P.adj ~ Comparison,
+        data = DAt$res,
+        threshold = 0.05)
+DAtdif
+
+
+boxAmb <- ggplot(carapa,aes(Ambiente, DAP)) +
+  geom_boxplot(aes(fill = Ambiente)) +
+  geom_jitter(width = 0.1) +
+  ylab("DAP (cm)") +
+  theme_classic()
+boxAmb
+
+contAmb <- ggplot(data = carapa, mapping = aes(x = DAP, colour = Ambiente)) +
+    geom_histogram() +
+    theme_bw() +
+    facet_grid(. ~ Ambiente) +
+    ylab("N. individuos") +
+    xlab("DAP (cm)") +
+    theme_classic() +
+    theme(legend.position = "none")
+contAmb
+
+```
+```{r, echo=FALSE}
+boxAmb
+```
+Figura 8. Medida de diámetro a la altura del pecho para diferentes ambientes en que crece *Carapa guianensis*.
+
+```{r, echo=FALSE}
+contAmb
+```
+Figura 9. Histograma medida de diámetro a la altura del pecho para diferentes ambientes en que crece *Carapa guianensis*.
+
+
+# Discusión:
+La explotación de *C. guianensis* representa un riesgo para la estabilidad de la Amazonia brasileña, siendo una especie de amplia distribución, con una extensa historia de uso por parte del ser humano. Esta especie, hasta hace unos años con un importante vacío de información sirve de modelo de diagnostivo para la viabilidad de una explotación sostenible en ambientes naturales. Siendo que en este reporte analizo los resultados de un censo llevado a cabo en 2008, centrado en la distribución y estructura demográfica de adultos reproductivos y subadultos.
+
+Los datos tomados presentan una estructura de J invertida, la cual es característica de poblaciones con una tasa de reclutamiento continua, sin pérdida de cohortes completos debido a factores extrínsicos de la especie (Chien et al., 2008). Esta distribución muestra que pese al comportamiento reproductivo de masting para la especie, con producción de frutos cada 2 a 3 años esta ventana temporal no afecta las cohortes. Esto podría deberse a la existencia de un banco de semillas que perdura en el tiempo y que permite una germinación y reclutamiento continuo como proponen Nguyen et al. (2019). A su vez, encuentro un mayor crecimiento en sitios inundados que podría indicar un mayor vigor en zonas con abundante agua,  lo que se expresó en conjunto con una menor agregación individual y una mayor tendencia a la aleatoreidad, contrario a sitios no inundados y de transición. Esto se podría vincular a una mayor menor disponibilidad de sitios con las condiciones necesarias para el crecimiento de *C. guianensis* en sitios no inundados, así como un paisaje poco uniforme.
+
+Ante este estudio recomiendo llevar a cabo un mayor esfuerzo de muestreo al aumentar la duración del censo a un minimo de cuatro años para poder contemplar influencia de periodos de masting y presencia de bancos de semillas en la zona. A su vez, sugiero explorar información de geomorfología de la región para explicar diferencia en patrones de agregación para diferentes escenarios.
+
+## Conclusiones:
+
+- A partir de la estructura de J invertida observada para la totalidad de la población se puede inferir reclutamiento continuo de la especie sin afectación por periodos extensos por masting o años de baja germinación y reclutamiento.
+- La disponibilidad de agua en suelo en ambiente inmediato explica tendencias de tallas para Carapa guianensis de con mayor peso que si se generalizan condiciones de grandes extensiones territoriales.
+- No se pueden hacer conclusiones sobre la producción de frutos debido a corto intervalo de muestreo que no contempla influencia de masting.
+
+
+# Referencias
+
+
+  Bruna, E.M., Ribeiro, M.B.N., 2005. Regeneration and population structure of Heliconia acuminata in Amazonian secondary forests with contrasting land- use histories. *J. Trop. Ecol. 21*, 127–131
+
+  Chien, P., Zuidema, P., Nghia, N., 2008. Conservation prospects for threatened Vietnamese tree species: results from a demographic study. *Population ecology 50*, 227-237
+
+  Dayanandan, S., Dole, J., Bawa, K., Kesseli, R., 1999. Population structure delineated with microsatellite markers in fragmented populations of a tropical tree, Carapa guianensis (Meliaceae). *Mol. Ecol. 8*, 1585–1592.
+
+  Fearnside, P.M., 2005. Deforestation in Brazilian Amazonia: history, rates, and consequences. *Conserv. Biol. 19*, 680–688.
+
+  Klimas, C. 2007. Population structure of *Carapa guianensis* in two forest types in the southwestern Brazilian Amazon. *Fores Eology and Management 2007*, 256-165
+
+  Nguyen, V., Buckley, Y., Salguero-Gómez, R., Wardle, G., 2019. Consequences of neglecting cryptic life stages from demographic models. *Ecologial Modelling 408*(15)
+
+  Peres, C.A., Baider, C., Zuidema, P.A., Wadt, L.H.O., Kainer, K.A., Gomes- Silva, D.A.P., Saloma˜o, R.P., Simo˜es, L.L., Franciosi, E.R.N., Valverde, F.C., Gribel, R., Shepard, G.H., Kanashiro, M., Coventry, P., Yu, D.W., Watkinson, A.R., Freckleton, R.P., 2003. Demographic threats to the sustainability of Brazil nut exploitation. *Science 302*, 2112–2114.
+
+  Wood, C.H., 2002. *Land use and deforestation in the Amazon*. In: Wood, C.H., Porro, R. (Eds.), *Land Use and Deforestation in the Amazon*. University Press of Florida, Gainesville, FL, pp. 1–38.
+
+
+# Información suplementaria
+
+Propiedad base de datos:
+Christie A. Klimas, correspondiente a artículo [Population structure of Carapa guianensis in two forest types in the southwestern Brazilian Amazon](https://www.sciencedirect.com/science/article/abs/pii/S0378112707004264?via%3Dihub)
+
+```{r, message = FALSE}
+
+DCs <- dunnTest(DAP ~ copa,
+              data= carapa,
+              method="bh")
+DCsdif <- cldList(P.adj ~ Comparison,
+        data = DCs$res,
+        threshold = 0.05)
+DCsdif
+
+contAmb <- ggplot(data = carapa, mapping = aes(x = DAP, colour = copa)) +
+    geom_histogram() +
+    theme_bw() +
+    facet_grid(. ~ copa) +
+    ylab("N. individuos") +
+    xlab("DAP (cm)") +
+    theme(legend.position = "none")
+contAmb
+```
+Figura complementaria 1. Histograma para diámetro a la altura del pecho según estrado del dosel para *Carapa guianensis* 
+
+
+```{r, message = FALSE}
+contprod <- ggplot(data = carapa, mapping = aes(x = DAP, colour = Prod.)) +
+    geom_histogram() +
+    theme_bw() +
+    facet_grid(. ~ Prod.) +
+    ylab("N. individuos") +
+    xlab("DAP (cm)") +
+    theme(legend.position = "none")
+contprod
+
+```
+Figura complementaria 2. Histograma para producción de frutos según diámetro a la altura para *Carapa guianensis*
+
+**Información de la sesión**
+
+```{r session, echo=FALSE}
+sessionInfo() # Información de la sesión
 ```
